@@ -44,17 +44,8 @@ def publish_story():
     else:
         return jsonify({"message": "Error saving story to Firebase"}), 500
 
-# Ruta para obtener todos los stories
-@app.route("/get", methods=["GET"])
-def get_stories():
-    response = requests.get(FIREBASE_URL + ".json")  # Obtener todos los datos de Firebase
-    if response.status_code == 200:
-        return jsonify(response.json()), 200
-    else:
-        return jsonify({"message": "Error fetching stories from Firebase"}), 500
-
 # Ruta para ver un story por su ID
-@app.route("/story/<story_id>", methods=["GET"])
+@app.route("/story/<story_id>")
 def view_story(story_id):
     # Realiza una petición GET a Firebase para obtener el story
     url = f"{FIREBASE_URL}/{story_id}.json"
@@ -68,10 +59,8 @@ def view_story(story_id):
     # HTML para mostrar el story
     html_template = """
     <!DOCTYPE html>
-    <html lang="es">
+    <html>
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{{ story_id }}</title>
         <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600&display=swap" rel="stylesheet">
         <style>
@@ -88,33 +77,10 @@ def view_story(story_id):
                 text-align: center;
                 padding: 1em;
             }
-
-            h1 {
-                font-size: 3em;
-            }
-
-            p {
-                font-size: 1.5em;
-            }
-
-            .creator-info {
-                margin-top: 20px;
-                font-size: 1em;
-                font-weight: bold;
-            }
-
-            .score {
-                margin-top: 10px;
-                font-size: 1.2em;
-            }
         </style>
     </head>
     <body>
-        <div>
-            <h1>{{ text }}</h1>
-            <p class="creator-info">Creador: {{ creator }}</p>
-            <p class="score">Puntuación: {{ score }}</p>
-        </div>
+        <div>{{ text }}</div>
     </body>
     </html>
     """
@@ -123,15 +89,42 @@ def view_story(story_id):
         html_template,
         story_id=story_id,
         bg_color=story["bg_color"],
-        text=story["text"],
-        creator=story["creator"],
-        score=json.dumps(story["score"])  # Convirtiendo la puntuación a un formato adecuado
+        text=story["text"]
     )
 
-# Ruta raíz para confirmar que el servidor está funcionando
-@app.route("/", methods=["GET"])
-def index():
-    return "Bienvenido al sistema de Stories. Usa /publish para publicar un nuevo story y /story/<id> para ver un story."
+# Ruta para recomendar stories según los intereses del usuario
+@app.route("/recommend", methods=["POST"])
+def recommend_stories():
+    # Obtener los intereses del usuario desde el body
+    user_interests = request.get_json(force=True)
+    # Obtener el parámetro "recom" desde la URL para saber cuántos stories recomendar
+    recom_count = request.args.get("recom", default=5, type=int)  # Default a 5 si no se pasa el parámetro
+
+    # Obtener todos los stories almacenados en Firebase
+    response = requests.get(f"{FIREBASE_URL}.json")
+    if response.status_code != 200:
+        return jsonify({"message": "Error fetching stories from Firebase"}), 500
+
+    all_stories = response.json()  # Todos los stories de Firebase
+
+    # Aquí podrías usar los intereses del usuario para filtrar los stories más adecuados
+    # Esto es solo un ejemplo básico: suponer que el score es un indicador de relevancia.
+    # Podrías mejorar este filtrado según lo que necesites.
+    
+    # Ordenar los stories según su puntuación (puedes ajustar esta lógica según el score)
+    sorted_stories = sorted(
+        all_stories.values(),
+        key=lambda story: sum(story.get("score", {}).get(interest, 0) for interest in user_interests),
+        reverse=True
+    )
+
+    # Obtener los 'recom_count' stories más relevantes
+    recommended_stories = sorted_stories[:recom_count]
+
+    # Retornar los IDs de las historias recomendadas
+    recommended_ids = [story["id"] for story in recommended_stories]
+
+    return jsonify({"recommended_ids": recommended_ids}), 200
 
 # Inicia el servidor Flask
 if __name__ == "__main__":
