@@ -21,16 +21,19 @@ def save_story_to_firebase(story_id, story_data):
     response = requests.put(url, json=story_data)  # Usa PUT para guardar o actualizar el story
     return response.status_code
     
-@app.route("/get", methods=["GET"])
-def get_all_stories():
-    # Obtiene todos los stories almacenados en Firebase
-    response = requests.get(f"{FIREBASE_URL}.json")
-    
+# Ruta para obtener los datos crudos de un story por su ID
+@app.route("/get/<story_id>")
+def get_story_data(story_id):
+    # Realiza una petición GET a Firebase para obtener el story
+    url = f"{FIREBASE_URL}/{story_id}.json"
+    response = requests.get(url)
+
     if response.status_code != 200:
-        return jsonify({"message": "Error fetching stories from Firebase"}), 500
-    
-    # Devuelve los datos crudos de todos los stories en formato JSON
-    return jsonify(response.json()), 200
+        return "Story not found", 404
+
+    # Devuelve los datos crudos del story en formato JSON
+    return jsonify(response.json())
+
 
 # Ruta para publicar un nuevo story
 @app.route("/publish", methods=["POST"])
