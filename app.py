@@ -3,6 +3,7 @@ import random
 import string
 from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
+import json
 
 app = Flask(__name__)
 CORS(app)
@@ -43,8 +44,17 @@ def publish_story():
     else:
         return jsonify({"message": "Error saving story to Firebase"}), 500
 
+# Ruta para obtener todos los stories
+@app.route("/get", methods=["GET"])
+def get_stories():
+    response = requests.get(FIREBASE_URL + ".json")  # Obtener todos los datos de Firebase
+    if response.status_code == 200:
+        return jsonify(response.json()), 200
+    else:
+        return jsonify({"message": "Error fetching stories from Firebase"}), 500
+
 # Ruta para ver un story por su ID
-@app.route("/story/<story_id>")
+@app.route("/story/<story_id>", methods=["GET"])
 def view_story(story_id):
     # Realiza una petición GET a Firebase para obtener el story
     url = f"{FIREBASE_URL}/{story_id}.json"
@@ -58,8 +68,10 @@ def view_story(story_id):
     # HTML para mostrar el story
     html_template = """
     <!DOCTYPE html>
-    <html>
+    <html lang="es">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{{ story_id }}</title>
         <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600&display=swap" rel="stylesheet">
         <style>
@@ -76,10 +88,33 @@ def view_story(story_id):
                 text-align: center;
                 padding: 1em;
             }
+
+            h1 {
+                font-size: 3em;
+            }
+
+            p {
+                font-size: 1.5em;
+            }
+
+            .creator-info {
+                margin-top: 20px;
+                font-size: 1em;
+                font-weight: bold;
+            }
+
+            .score {
+                margin-top: 10px;
+                font-size: 1.2em;
+            }
         </style>
     </head>
     <body>
-        <div>{{ text }}</div>
+        <div>
+            <h1>{{ text }}</h1>
+            <p class="creator-info">Creador: {{ creator }}</p>
+            <p class="score">Puntuación: {{ score }}</p>
+        </div>
     </body>
     </html>
     """
@@ -88,8 +123,15 @@ def view_story(story_id):
         html_template,
         story_id=story_id,
         bg_color=story["bg_color"],
-        text=story["text"]
+        text=story["text"],
+        creator=story["creator"],
+        score=json.dumps(story["score"])  # Convirtiendo la puntuación a un formato adecuado
     )
+
+# Ruta raíz para confirmar que el servidor está funcionando
+@app.route("/", methods=["GET"])
+def index():
+    return "Bienvenido al sistema de Stories. Usa /publish para publicar un nuevo story y /story/<id> para ver un story."
 
 # Inicia el servidor Flask
 if __name__ == "__main__":
