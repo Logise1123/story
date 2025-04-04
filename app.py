@@ -121,7 +121,10 @@ def view_story(story_id):
 @app.route("/recommend", methods=["POST"])
 def recommend_stories():
     # Obtener los intereses del usuario desde el body
-    user_interests = request.get_json(force=True)
+    request_data = request.get_json(force=True)
+    user_interests = request_data.get("interests", {})  # Intereses del usuario como un diccionario clave-valor
+    viewed_ids = request_data.get("viewed_ids", [])  # IDs de videos que ya ha visto
+
     # Obtener el parámetro "recom" desde la URL para saber cuántos stories recomendar
     recom_count = request.args.get("recom", default=5, type=int)  # Default a 5 si no se pasa el parámetro
 
@@ -132,14 +135,22 @@ def recommend_stories():
 
     all_stories = response.json()  # Todos los stories de Firebase
 
-    # Aquí podrías usar los intereses del usuario para filtrar los stories más adecuados
-    # Esto es solo un ejemplo básico: suponer que el score es un indicador de relevancia.
-    # Podrías mejorar este filtrado según lo que necesites.
-    
-    # Ordenar los stories según su puntuación (puedes ajustar esta lógica según el score)
+    # Filtrar los stories para excluir aquellos que el usuario ya ha visto
+    filtered_stories = [
+        story for story in all_stories.values() if story["id"] not in viewed_ids
+    ]
+
+    # Función para calcular la relevancia de un story basado en el producto punto entre los intereses y el score
+    def calculate_relevance(story_score):
+        relevance = 0
+        for key, value in user_interests.items():
+            relevance += value * story_score.get(key, 0)
+        return relevance
+
+    # Ordenar los stories según su relevancia calculada (producto punto entre intereses y score)
     sorted_stories = sorted(
-        all_stories.values(),
-        key=lambda story: sum(story.get("score", {}).get(interest, 0) for interest in user_interests),
+        filtered_stories,
+        key=lambda story: calculate_relevance(story.get("score", {})),
         reverse=True
     )
 
@@ -150,6 +161,7 @@ def recommend_stories():
     recommended_ids = [story["id"] for story in recommended_stories]
 
     return jsonify({"recommended_ids": recommended_ids}), 200
+
 
 # Inicia el servidor Flask
 if __name__ == "__main__":
