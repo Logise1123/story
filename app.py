@@ -20,7 +20,18 @@ def save_story_to_firebase(story_id, story_data):
     url = f"{FIREBASE_URL}/{story_id}.json"
     response = requests.put(url, json=story_data)  # Usa PUT para guardar o actualizar el story
     return response.status_code
-    
+@app.route('/')
+def home():
+    return """
+        <html>
+            <head><title>Story App</title></head>
+            <body style="font-family: Quicksand, sans-serif;">
+                <h1>Bienvenido a la Story App</h1>
+                <p>Accede a los datos en formato crudo <a href="/get">aquí</a>.</p>
+                <p><a href="/story/lx63">Ver Story</a></p>
+            </body>
+        </html>
+    """
 # Ruta para obtener los datos crudos de un story por su ID
 @app.route("/get/<story_id>")
 def get_story_data(story_id):
