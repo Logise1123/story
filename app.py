@@ -20,6 +20,7 @@ def save_story_to_firebase(story_id, story_data):
     url = f"{FIREBASE_URL}/{story_id}.json"
     response = requests.put(url, json=story_data)  # Usa PUT para guardar o actualizar el story
     return response.status_code
+
 @app.route('/')
 def home():
     return """
@@ -32,36 +33,34 @@ def home():
             </body>
         </html>
     """
+
 # Ruta para obtener los datos crudos de un story por su ID
 @app.route("/get/<story_id>")
 def get_story_data(story_id):
-    # Realiza una petición GET a Firebase para obtener el story
     url = f"{FIREBASE_URL}/{story_id}.json"
     response = requests.get(url)
 
     if response.status_code != 200:
         return "Story not found", 404
 
-    # Devuelve los datos crudos del story en formato JSON
     return jsonify(response.json())
-
 
 # Ruta para publicar un nuevo story
 @app.route("/publish", methods=["POST"])
 def publish_story():
-    data = request.get_json(force=True)  # Obtiene los datos JSON del request
-    story_id = generate_id()  # Genera un ID único para el story
+    data = request.get_json(force=True)
+    story_id = generate_id()
 
-    # Crea un objeto de story
+    # Se crea el objeto del story incluyendo el nuevo campo sound_url
     story = {
         "id": story_id,
         "text": data.get("text"),
-        "bg_color": data.get("bg_color", "#000000"),  # Fondo por defecto negro
-        "creator": data.get("creator", "anon"),  # Creador por defecto "anon"
-        "score": data.get("score", {})  # Puntuación vacía si no se proporciona
+        "bg_color": data.get("bg_color", "#000000"),
+        "creator": data.get("creator", "anon"),
+        "score": data.get("score", {}),
+        "sound_url": data.get("sound_url")  # Nuevo campo sound_url
     }
 
-    # Guarda el story en Firebase
     status_code = save_story_to_firebase(story_id, story)
 
     if status_code == 200:
@@ -72,16 +71,14 @@ def publish_story():
 # Ruta para ver un story por su ID
 @app.route("/story/<story_id>")
 def view_story(story_id):
-    # Realiza una petición GET a Firebase para obtener el story
     url = f"{FIREBASE_URL}/{story_id}.json"
     response = requests.get(url)
 
     if response.status_code != 200:
         return "Story not found", 404
 
-    story = response.json()  # Extrae el contenido JSON del story
+    story = response.json()
 
-    # HTML para mostrar el story
     html_template = """
     <!DOCTYPE html>
     <html>
@@ -120,49 +117,37 @@ def view_story(story_id):
 # Ruta para recomendar stories según los intereses del usuario
 @app.route("/recommend", methods=["POST"])
 def recommend_stories():
-    # Obtener los intereses del usuario desde el body
     request_data = request.get_json(force=True)
-    user_interests = request_data.get("interests", {})  # Intereses del usuario como un diccionario clave-valor
-    viewed_ids = request_data.get("viewed_ids", [])  # IDs de videos que ya ha visto
+    user_interests = request_data.get("interests", {})
+    viewed_ids = request_data.get("viewed_ids", [])
+    recom_count = request.args.get("recom", default=5, type=int)
 
-    # Obtener el parámetro "recom" desde la URL para saber cuántos stories recomendar
-    recom_count = request.args.get("recom", default=5, type=int)  # Default a 5 si no se pasa el parámetro
-
-    # Obtener todos los stories almacenados en Firebase
     response = requests.get(f"{FIREBASE_URL}.json")
     if response.status_code != 200:
         return jsonify({"message": "Error fetching stories from Firebase"}), 500
 
-    all_stories = response.json()  # Todos los stories de Firebase
+    all_stories = response.json()
 
-    # Filtrar los stories para excluir aquellos que el usuario ya ha visto
     filtered_stories = [
         story for story in all_stories.values() if story["id"] not in viewed_ids
     ]
 
-    # Función para calcular la relevancia de un story basado en el producto punto entre los intereses y el score
     def calculate_relevance(story_score):
         relevance = 0
         for key, value in user_interests.items():
             relevance += value * story_score.get(key, 0)
         return relevance
 
-    # Ordenar los stories según su relevancia calculada (producto punto entre intereses y score)
     sorted_stories = sorted(
         filtered_stories,
         key=lambda story: calculate_relevance(story.get("score", {})),
         reverse=True
     )
 
-    # Obtener los 'recom_count' stories más relevantes
     recommended_stories = sorted_stories[:recom_count]
-
-    # Retornar los IDs de las historias recomendadas
     recommended_ids = [story["id"] for story in recommended_stories]
 
     return jsonify({"recommended_ids": recommended_ids}), 200
 
-
-# Inicia el servidor Flask
 if __name__ == "__main__":
     app.run(debug=True)
