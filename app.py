@@ -160,6 +160,15 @@ def recommend_stories():
     recommended_ids = [story.get("id") for story in recommended_stories]
 
     return jsonify({"recommended_ids": recommended_ids}), 200
+    
+@app.route("/update", methods=["GET"])
+def update_stories_list():
+    try:
+        load_stories_from_firebase()
+        return jsonify({"message": "Stories list updated from Firebase"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)
