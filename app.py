@@ -1,6 +1,7 @@
 import requests
 import random
 import string
+import ast  # Para convertir strings a diccionarios de forma segura
 from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 import json
@@ -71,13 +72,21 @@ def publish_story():
     data = request.get_json(force=True)
     story_id = generate_id()
 
+    # Validación del campo score para asegurarse de que se guarde como dict
+    score = data.get("score", {})
+    if isinstance(score, str):
+        try:
+            score = ast.literal_eval(score)
+        except Exception:
+            score = {}
+
     # Se crea el objeto del story incluyendo el nuevo campo sound_url
     story = {
         "id": story_id,
         "text": data.get("text"),
         "bg_color": data.get("bg_color", "#000000"),
         "creator": data.get("creator", "anon"),
-        "score": data.get("score", {}),
+        "score": score,
         "sound_url": data.get("sound_url")  # Nuevo campo sound_url
     }
 
@@ -146,6 +155,12 @@ def recommend_stories():
     ]
 
     def calculate_relevance(story_score):
+        # Si el score viene como string, intenta convertirlo a dict
+        if isinstance(story_score, str):
+            try:
+                story_score = ast.literal_eval(story_score)
+            except Exception:
+                story_score = {}
         relevance = 0
         for key, value in user_interests.items():
             relevance += value * story_score.get(key, 0)
