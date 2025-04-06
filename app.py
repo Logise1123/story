@@ -11,8 +11,9 @@ CORS(app)
 # URL de Firebase Realtime Database
 FIREBASE_URL = "https://weberia-8dfa7-default-rtdb.europe-west1.firebasedatabase.app/story"
 
-# Lista global para almacenar los stories
+# Lista global para almacenar los stories y bandera de carga
 stories_list = []
+stories_loaded = False
 
 # Función para generar un ID único alfanumérico de 6 caracteres
 def generate_id():
@@ -35,10 +36,13 @@ def load_stories_from_firebase():
     else:
         stories_list = []
 
-# Cargar los stories antes de la primera petición
-@app.before_first_request
-def initialize():
-    load_stories_from_firebase()
+# Cargar los stories una sola vez antes de procesar la primera petición
+@app.before_request
+def ensure_stories_loaded():
+    global stories_loaded
+    if not stories_loaded:
+        load_stories_from_firebase()
+        stories_loaded = True
 
 @app.route('/')
 def home():
