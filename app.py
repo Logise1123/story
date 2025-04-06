@@ -100,6 +100,36 @@ def publish_story():
         return jsonify({"message": "Error saving story to Firebase"}), 500
 
 # Ruta para ver un story por su ID desde la lista
+# Nueva ruta para actualizar el score de todos los stories
+@app.route("/update", methods=["POST"])
+def update_all_scores():
+    new_scores = {
+        "math": 1,
+        "science": 0.5,
+        "haiku": 0.5,
+        "love": 0.5,
+        "poem": 0.5
+    }
+
+    updated = 0
+    for story in stories_list:
+        story_id = story.get("id")
+        if not story_id:
+            continue
+
+        # Actualiza en memoria
+        story["score"] = new_scores.copy()
+
+        # Actualiza en Firebase
+        response = requests.patch(f"{FIREBASE_URL}/{story_id}.json", json={"score": new_scores})
+        if response.status_code == 200:
+            updated += 1
+
+    return jsonify({
+        "message": f"Score actualizado para {updated} stories.",
+        "new_score": new_scores
+    }), 200
+
 @app.route("/story/<story_id>")
 def view_story(story_id):
     story = next((s for s in stories_list if s.get("id") == story_id), None)
