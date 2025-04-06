@@ -100,36 +100,6 @@ def publish_story():
         return jsonify({"message": "Error saving story to Firebase"}), 500
 
 # Ruta para ver un story por su ID desde la lista
-# Nueva ruta para actualizar el score de todos los stories
-@app.route("/update", methods=["POST"])
-def update_all_scores():
-    new_scores = {
-        "math": 1,
-        "science": 0.5,
-        "haiku": 0.5,
-        "love": 0.5,
-        "poem": 0.5
-    }
-
-    updated = 0
-    for story in stories_list:
-        story_id = story.get("id")
-        if not story_id:
-            continue
-
-        # Actualiza en memoria
-        story["score"] = new_scores.copy()
-
-        # Actualiza en Firebase
-        response = requests.patch(f"{FIREBASE_URL}/{story_id}.json", json={"score": new_scores})
-        if response.status_code == 200:
-            updated += 1
-
-    return jsonify({
-        "message": f"Score actualizado para {updated} stories.",
-        "new_score": new_scores
-    }), 200
-
 @app.route("/story/<story_id>")
 def view_story(story_id):
     story = next((s for s in stories_list if s.get("id") == story_id), None)
@@ -171,38 +141,22 @@ def view_story(story_id):
         text=story["text"]
     )
 
-# Ruta para recomendar stories según los intereses del usuario usando la lista en memoria
+# Ruta para recomendar stories que no han sido vistos, de forma aleatoria
 @app.route("/recommend", methods=["POST"])
 def recommend_stories():
     request_data = request.get_json(force=True)
-    user_interests = request_data.get("interests", {})
     viewed_ids = request_data.get("viewed_ids", [])
     recom_count = request.args.get("recom", default=5, type=int)
 
     # Filtrar stories que no han sido vistas
-    filtered_stories = [
-        story for story in stories_list if story.get("id") not in viewed_ids
-    ]
+    filtered_stories = [story for story in stories_list if story.get("id") not in viewed_ids]
 
-    def calculate_relevance(story_score):
-        # Si el score viene como string, intenta convertirlo a dict
-        if isinstance(story_score, str):
-            try:
-                story_score = ast.literal_eval(story_score)
-            except Exception:
-                story_score = {}
-        relevance = 0
-        for key, value in user_interests.items():
-            relevance += value * story_score.get(key, 0)
-        return relevance
+    # Seleccionar aleatoriamente recom_count stories
+    if len(filtered_stories) <= recom_count:
+        recommended_stories = filtered_stories
+    else:
+        recommended_stories = random.sample(filtered_stories, recom_count)
 
-    sorted_stories = sorted(
-        filtered_stories,
-        key=lambda story: calculate_relevance(story.get("score", {})),
-        reverse=True
-    )
-
-    recommended_stories = sorted_stories[:recom_count]
     recommended_ids = [story.get("id") for story in recommended_stories]
 
     return jsonify({"recommended_ids": recommended_ids}), 200
